@@ -3,6 +3,8 @@ Option Explicit
 Public d
 Dim key
 Dim lastRow As Integer
+Dim icounter As Integer
+
 
 
 Sub main()
@@ -11,15 +13,11 @@ Call sortTable
 Set d = CreateObject("Scripting.Dictionary")
 
 '2 Process
-getCategory (3)
+getCategory (5)
 
-'3 Print result
-For Each key In d.Keys
-    Debug.Print key, d(key)
-Next key
-
-'4 Clear dictionary
+'3 Clear dictionary, counter
 Set d = Nothing
+icounter = 0
 
 End Sub
 
@@ -35,8 +33,9 @@ End Sub
 Function getCategory(n As Integer)
 Dim searchCell As Range
 Dim purchasingAmount As Integer
-Dim icounter As Integer
 Dim i, j As Integer
+Dim temporaryTimes As Integer
+
 
 ' Get lastRow number to determine search scale
 lastRow = Sheet1.Cells(Sheet1.Rows.Count, 1).End(xlUp).Row
@@ -53,7 +52,6 @@ Next
 For Each key In d.Keys
     '1. If total purchasing times are more than request number, rewrite the items as total purchasing amount
     If d(key) >= n Then
-        
         d(key) = 0 'initialize the item as 0
         icounter = 0 'initialize the counter
         
@@ -69,18 +67,24 @@ For Each key In d.Keys
                 'When it arrives to the bound _
                 'Check if the next row is still the same category with same purchasing date. _
                 'If yes, add purchasing amount before quitting the loop
-                If icounter = n Then Call checkSameDate(i)
-                
+                If icounter = n Then
+                    Call checkSameDate(i)
+                    Debug.Print "Average Purchasing amount of Category "; key & " is "; d(key) / icounter
+                End If
+                                
             End If
         Next
-    
+        
     '2. If total purchasing times are less than request, delete the category from dictionary
     Else: d.Remove key
     
     End If
 Next
 
+
+
 End Function
+
 
 Private Sub checkSameDate(ByVal rowNumber As Integer)
 ' When it comes to the bound, check the next rows. If next rows are the same category with same date, add their purchasing amounts into dictionary
@@ -91,6 +95,7 @@ For i = rowNumber + 1 To lastRow
     'If Category and Date equal to the checking row, add their purchasing amounts into dictionary
     If Range("A" & i).Value = Range("A" & rowNumber).Value And Range("B" & rowNumber).Value = Range("B" & i).Value Then
         d(key) = d(key) + Range("A" & i).Offset(0, 2).Value
+        icounter = icounter + 1
     End If
 Next
 End Sub
