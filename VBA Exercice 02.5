@@ -1,0 +1,96 @@
+Option Explicit
+'Set a public Dictionary (d)
+Public d
+Dim key
+Dim lastRow As Integer
+
+
+Sub main()
+'1 Prepare: Sort the table and create dictionary
+Call sortTable
+Set d = CreateObject("Scripting.Dictionary")
+
+'2 Process
+getCategory (3)
+
+'3 Print result
+For Each key In d.Keys
+    Debug.Print key, d(key)
+Next key
+
+'4 Clear dictionary
+Set d = Nothing
+
+End Sub
+
+' sort existant table to simplify process
+' key1 = Category (A-Z)
+' key2 = Date (New to old)
+
+Sub sortTable()
+Sheet1.Columns("a:c").Sort key1:=Range("B:B"), order1:=xlAscending, key2:=Range("A:A"), order2:=xlDescending, Header:=xlYes
+
+End Sub
+
+Function getCategory(n As Integer)
+Dim searchCell As Range
+Dim purchasingAmount As Integer
+Dim icounter As Integer
+Dim i, j As Integer
+
+' Get lastRow number to determine search scale
+lastRow = Sheet1.Cells(Sheet1.Rows.Count, 1).End(xlUp).Row
+
+'Count the number of each category
+'Write Category_Name as Key, Number_of_Each_Category as Item
+For Each searchCell In Sheet1.Range("B2:B" & lastRow)
+    d(searchCell.Value) = d(searchCell.Value) + 1
+Next
+
+
+'By using the same dictionary(d), for each category (Key), rewrite their total amount into items
+
+For Each key In d.Keys
+    '1. If total purchasing times are more than request number, rewrite the items as total purchasing amount
+    If d(key) >= n Then
+        
+        d(key) = 0 'initialize the item as 0
+        icounter = 0 'initialize the counter
+        
+        For i = 2 To lastRow
+            Set searchCell = Range("B" & i)
+            If searchCell.Value = key And icounter < n Then
+                
+                'Add purchasing amounts into item
+                'Count times
+                d(key) = d(key) + searchCell.Offset(0, 1).Value
+                icounter = icounter + 1
+                
+                'When it arrives to the bound _
+                'Check if the next row is still the same category with same purchasing date. _
+                'If yes, add purchasing amount before quitting the loop
+                If icounter = n Then Call checkSameDate(i)
+                
+            End If
+        Next
+    
+    '2. If total purchasing times are less than request, delete the category from dictionary
+    Else: d.Remove key
+    
+    End If
+Next
+
+End Function
+
+Private Sub checkSameDate(ByVal rowNumber As Integer)
+' When it comes to the bound, check the next rows. If next rows are the same category with same date, add their purchasing amounts into dictionary
+Dim i As Integer
+
+'check from next row to last row
+For i = rowNumber + 1 To lastRow
+    'If Category and Date equal to the checking row, add their purchasing amounts into dictionary
+    If Range("A" & i).Value = Range("A" & rowNumber).Value And Range("B" & rowNumber).Value = Range("B" & i).Value Then
+        d(key) = d(key) + Range("A" & i).Offset(0, 2).Value
+    End If
+Next
+End Sub
