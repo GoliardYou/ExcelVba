@@ -1,0 +1,212 @@
+Option Explicit
+Dim newReportName As String
+Dim workingPath As String
+Dim workingBook As Workbook
+Dim d
+
+Sub checkdatetest()
+Workbooks("testfinal" & ".xlsx").Activate
+Set workingBook = Workbooks("testfinal" & ".xlsx")
+'this step is OK
+'Call FilterPurchasingData
+'call checkid
+Call getAllFlowIDs
+Call checkIfRcdExists
+
+End Sub
+
+Sub main()
+Application.ScreenUpdating = True
+
+Application.ScreenUpdating = False
+workingPath = Application.Workbooks("main.xlsm").Path
+Debug.Print workingPath
+
+'Create New Reporting Document xlsx
+    '1 get Name
+    newReportName = Application.InputBox("Please name your new report: ", "Create New Report")
+    '2 Create Excel file
+    Call createNewReport(newReportName)
+    Workbooks(newReportName & ".xlsx").Activate
+    Set workingBook = Workbooks(newReportName & ".xlsx")
+'Copy essential sheets to New Reporting Document
+    Dim openPositionPath As String
+    Dim populationPath As String
+    Dim mpFlowPath As String
+    Dim rcdPath As String
+    Dim arrSheets
+    
+    
+    MsgBox ("Please choose the Open_Position_Report file")
+    openPositionPath = getWorkbookPath()
+    Call copySheets(openPositionPath, "GOPR Detail")
+    
+    MsgBox ("Please choose the All_M&P file")
+    populationPath = getWorkbookPath()
+    Call copySheets(populationPath, "AllM&P")
+    
+    MsgBox ("Please choose the PIMS_M&P_Flow file")
+    mpFlowPath = getWorkbookPath()
+    Call copySheets2(mpFlowPath, Array("Resignations 2019", "Dismissal 2019", "External Hiring 2019", "Mobility 2019"))
+    
+    MsgBox ("Please choose the RCD file")
+    rcdPath = getWorkbookPath()
+    Call copySheets2(rcdPath, Array("RCD2018", "AdvancedFilter"))
+
+'Process data
+
+'Save and quit
+Application.ScreenUpdating = True
+End Sub
+Sub createNewReport(newFileName As String)
+Dim Newbook As Object
+Set Newbook = Workbooks.Add
+ With Newbook
+ .SaveAs fileName:=workingPath & "\" & newFileName & ".xlsx"
+ End With
+End Sub
+
+Function getWorkbookPath() As String
+
+With Application.FileDialog(msoFileDialogFilePicker)
+    .InitialFileName = workingPath & "\"
+    .Show
+    getWorkbookPath = .SelectedItems(1)
+End With
+
+
+End Function
+Sub copySheets(WorkBookPath As String, WorkSheetName As String)
+Dim targWorkBook As Workbook
+Set targWorkBook = Application.Workbooks.Open(WorkBookPath)
+targWorkBook.Worksheets(WorkSheetName).Copy Before:=Workbooks(newReportName & ".xlsx").Sheets(1)
+targWorkBook.Close
+End Sub
+Sub copySheets2(WorkBookPath As String, arrSheetNames As Variant)
+Dim targWorkBook As Workbook
+Dim sheetname
+
+Set targWorkBook = Application.Workbooks.Open(WorkBookPath)
+For Each sheetname In arrSheetNames
+    targWorkBook.Worksheets(sheetname).Copy Before:=Workbooks(newReportName & ".xlsx").Sheets(1)
+Next
+targWorkBook.Close
+End Sub
+
+Sub autoFilter(SheetX_All As Worksheet, SheetX_fonction As Worksheet, Criteria As Range)
+Dim lastRow_a, lastRow_f As Integer
+lastRow_a = SheetX_All.Cells(SheetX_All.Rows.Count, 1).End(xlUp).Row
+lastRow_f = SheetX_fonction.Cells(SheetX_fonction.Rows.Count, 1).End(xlUp).Row
+SheetX_fonction.Range("A1:BZ" & lastRow_f).Clear
+SheetX_All.Range("A1:AZ" & lastRow_a).AdvancedFilter Action:=xlFilterCopy, CriteriaRange:= _
+        Criteria, CopyToRange:=SheetX_fonction.Range("A1"), Unique:=False
+End Sub
+
+Sub FilterPurchasingData()
+Dim cPurchasing As Range
+Dim cPurchasing_MoIn As Range
+Dim cPurchasing_MoOut As Range
+Dim cPurchasing_MoWithin As Range
+Dim shtNames()
+Dim i As Integer
+
+Dim newSheet As Worksheet
+
+Set cPurchasing = workingBook.Sheets("AdvancedFilter").Range("A1:G8")
+Set cPurchasing_MoIn = workingBook.Sheets("AdvancedFilter").Range("A12:E14")
+Set cPurchasing_MoOut = workingBook.Sheets("AdvancedFilter").Range("A18:D20")
+Set cPurchasing_MoWithin = workingBook.Sheets("AdvancedFilter").Range("A23:D27")
+
+shtNames = Array("Resignation", "Dismissal", "External Hiring", "Mobility", "Mobility OUT", "Mobility IN", "Mobility Within")
+For i = LBound(shtNames) To UBound(shtNames)
+    If sheetExists(shtNames(i)) = False Then
+    
+    With workingBook
+        .Sheets.Add(After:=Worksheets(Worksheets.Count)).Name = shtNames(i)
+    End With
+    
+    End If
+Next
+
+
+autoFilter workingBook.Sheets("Resignations 2019"), workingBook.Worksheets("Resignation"), cPurchasing
+autoFilter workingBook.Sheets("Dismissal 2019"), workingBook.Worksheets("Dismissal"), cPurchasing
+autoFilter workingBook.Sheets("External Hiring 2019"), workingBook.Worksheets("External Hiring"), cPurchasing
+autoFilter workingBook.Sheets("Mobility 2019"), workingBook.Worksheets("Mobility"), cPurchasing
+
+'OUT
+autoFilter workingBook.Worksheets("Mobility"), workingBook.Worksheets("Mobility OUT"), cPurchasing_MoOut
+
+'IN
+autoFilter workingBook.Worksheets("Mobility"), workingBook.Worksheets("Mobility IN"), cPurchasing_MoIn
+
+'WITHIN
+autoFilter workingBook.Worksheets("Mobility"), workingBook.Worksheets("Mobility Within"), cPurchasing_MoWithin
+
+End Sub
+
+Sub getAllFlowIDs()
+Set d = CreateObject("Scripting.Dictionary")
+Dim arrIndex As Integer
+Dim arrSht()
+
+Dim IdCol As Integer
+Dim lastRow As Integer
+Dim i As Integer
+Dim ID As String
+
+IdCol = 1
+
+
+
+arrSht = Array("Resignations", "Dismissal", "External Hiring", "Mobility IN", "Mobility OUT", "Mobility Within")
+For arrIndex = LBound(arrSht) To UBound(arrSht)
+    
+'get ID Column number
+    With workingBook.Worksheets(arrSht(arrIndex))
+        Do While True
+            If .Cells(1, IdCol).Value = "Employee ID" Then Exit Do
+            IdCol = IdCol + 1
+        Loop
+        
+        'get last Row
+    
+        lastRow = .Cells(.Rows.Count, 1).End(xlUp).Row
+    
+        'write the ID into dictionary
+    
+        For i = 2 To lastRow
+            d(.Cells(i, IdCol).Value) = d(.Cells(i, IdCol).Value) & arrSht(arrIndex)
+        Next i
+    End With
+    
+Next arrIndex
+
+End Sub
+
+Sub checkIfRcdExists()
+Dim searchRg As Range
+Set searchRg = workingBook.Worksheets("RCD2018").Range("B6:B62")
+Dim cl As Range
+
+For Each cl In Range
+    If d.exists(cl.Value) Then
+        cl.Offset(0, 12).Value = d(cl.Value)
+    End If
+Next
+
+End Sub
+
+Sub testmain()
+
+End Sub
+Function sheetExists(ByVal sheetToFind As String) As Boolean
+    Dim Sheet As Worksheet
+    For Each Sheet In Worksheets
+        If sheetToFind = Sheet.Name Then
+            sheetExists = True
+            Exit Function
+        End If
+    Next Sheet
+    sheetExists = False
+End Function
