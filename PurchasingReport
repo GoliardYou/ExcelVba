@@ -2,24 +2,19 @@ Option Explicit
 Dim newReportName As String
 Dim workingPath As String
 Dim workingBook As Workbook
-Dim d
+Dim d As Object
+
 
 Sub checkdatetest()
 Workbooks("testfinal" & ".xlsx").Activate
 Set workingBook = Workbooks("testfinal" & ".xlsx")
 'this step is OK
-'Call FilterPurchasingData
-'call checkid
-Call getAllFlowIDs
-Call checkIfRcdExists
 
 End Sub
 
 Sub main()
-Application.ScreenUpdating = True
-
 Application.ScreenUpdating = False
-workingPath = Application.Workbooks("main.xlsm").Path
+workingPath = Application.ThisWorkbook.Path
 Debug.Print workingPath
 
 'Create New Reporting Document xlsx
@@ -54,8 +49,14 @@ Debug.Print workingPath
     Call copySheets2(rcdPath, Array("RCD2018", "AdvancedFilter"))
 
 'Process data
-
+Call FilterPurchasingData
+Call getAllFlowIDs
+Call checkIfRcdExists
+Set d = Nothing
 'Save and quit
+workingBook.Save
+
+
 Application.ScreenUpdating = True
 End Sub
 Sub createNewReport(newFileName As String)
@@ -151,22 +152,30 @@ Dim arrIndex As Integer
 Dim arrSht()
 
 Dim IdCol As Integer
+Dim monthCol As Integer
+
 Dim lastRow As Integer
 Dim i As Integer
 Dim ID As String
 
-IdCol = 1
 
-
-
-arrSht = Array("Resignations", "Dismissal", "External Hiring", "Mobility IN", "Mobility OUT", "Mobility Within")
+arrSht = Array("Resignation", "Dismissal", "Mobility IN", "Mobility OUT", "Mobility Within")  ' no need to check "External Hiring", they will not be in RCD 2018
 For arrIndex = LBound(arrSht) To UBound(arrSht)
-    
+    monthCol = 1
+    IdCol = 1
 'get ID Column number
     With workingBook.Worksheets(arrSht(arrIndex))
+        
         Do While True
             If .Cells(1, IdCol).Value = "Employee ID" Then Exit Do
             IdCol = IdCol + 1
+        Loop
+        
+'get month Column number
+
+        Do While True
+            If InStr(1, .Cells(1, monthCol).Value, "month", vbTextCompare) > 0 Then Exit Do
+            monthCol = monthCol + 1
         Loop
         
         'get last Row
@@ -176,7 +185,7 @@ For arrIndex = LBound(arrSht) To UBound(arrSht)
         'write the ID into dictionary
     
         For i = 2 To lastRow
-            d(.Cells(i, IdCol).Value) = d(.Cells(i, IdCol).Value) & arrSht(arrIndex)
+            d(CStr(.Cells(i, IdCol))) = d(CStr(.Cells(i, IdCol))) & arrSht(arrIndex) & " in " & .Cells(i, monthCol).Value & " " ' Here we use "CStr" instead of ".Value" to advoice unnnecessary distinguishment between numeric and string data
         Next i
     End With
     
@@ -188,18 +197,16 @@ Sub checkIfRcdExists()
 Dim searchRg As Range
 Set searchRg = workingBook.Worksheets("RCD2018").Range("B6:B62")
 Dim cl As Range
+workingBook.Worksheets("RCD2018").Range("n6:n62").ClearContents
 
-For Each cl In Range
-    If d.exists(cl.Value) Then
-        cl.Offset(0, 12).Value = d(cl.Value)
+For Each cl In searchRg
+    If d.exists(CStr(cl)) Then
+        cl.Offset(0, 12).Value = d(CStr(cl.Value))
     End If
 Next
 
 End Sub
 
-Sub testmain()
-
-End Sub
 Function sheetExists(ByVal sheetToFind As String) As Boolean
     Dim Sheet As Worksheet
     For Each Sheet In Worksheets
